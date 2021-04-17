@@ -1,0 +1,7 @@
+MANIFEST
+build/
+contfrac.egg-info/
+dist/
+docs/
+venv/
+.idea/
