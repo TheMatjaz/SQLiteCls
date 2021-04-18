@@ -9,6 +9,10 @@ from typing import Optional, List, Any, Iterable
 
 
 def cursor_column_names(cursor: sqlite3.Cursor) -> List[str]:
+    """Extracts the column names out of a cursor.
+
+    Very useful to get the list of column names for a just-performed
+    SELECT query. Does not alter the cursor."""
     return [col[0] for col in cursor.description]
 
 
@@ -16,7 +20,7 @@ class SqliteDb:
     """Class wrapper of an SQLite connection that can be reopened, loading
     a DB-initialisations script when creating the file the first time."""
 
-    def __init__(self, db_file_name: str,
+    def __init__(self, db_file_name: str = ':memory:',
                  init_script_file_name: Optional[str] = None):
         """Prepares a closed connection, to be opened when entering the
         context (__enter__) using the `with` operator.
@@ -25,7 +29,7 @@ class SqliteDb:
 
         Args:
             db_file_name: path to the SQLite database file to open or to
-                create.
+                create. Default to an in-memory database.
             init_script_file_name: path to the SQL script that fills the
                 database only when it's created for the first time.
                 When None, no init operation is performed.
@@ -46,11 +50,9 @@ class SqliteDb:
             self.execute_sql_file(self.init_script_file_name)
         return self
 
-    def close(self, commit: bool = False) -> None:
+    def close(self, commit: bool = True) -> None:
         """Close the connection gracefully."""
         if self.cursor:
-            if commit:
-                self.commit()
             self.cursor.close()
             self.cursor = None
         if self.connection:
@@ -68,8 +70,13 @@ class SqliteDb:
         """Close the connection gracefully."""
         self.close()
 
+    def __del__(self) -> None:
+        """Close the connection gracefully on destruction."""
+        self.close()
+
     def execute_sql_file(self, file_name: str,
                          encoding: str = 'UTF-8') -> sqlite3.Cursor:
+        """Executes all the SQL queries loaded from a file."""
         with open(file_name, encoding=encoding) as script:
             return self.cursor.executescript(script.read())
 
@@ -84,7 +91,7 @@ class SqliteDb:
 
     def start_transaction(self) -> None:
         """Starts a transaction on the cursor."""
-        self.cursor.execute("START TRANSACTION")
+        self.cursor.execute("BEGIN TRANSACTION")
 
     def rollback(self) -> None:
         """Rolls back the transaction on the cursor."""
@@ -105,6 +112,15 @@ class SqliteDb:
         return [row[0] for row in cursor]
 
     def columns_names(self, table_name: str) -> List[str]:
-        """Fetches the names of the columns in a given table."""
-        cursor = self.cursor.execute('PRAGMA table_info(?);', (table_name,))
+        """Fetches the names of the columns in a given table.
+        If the table does not exists, an empty list is returned.
+
+        The table name IS NOT SANITISED, so please be careful with the
+        input.
+        """
+        cursor = self.cursor.execute(f'PRAGMA table_info({table_name});')
         return [row[1] for row in cursor]  # Extract just the names
+
+    def is_in_memory(self) -> bool:
+        """Returns true if the database in in-memory."""
+        return self.db_file_name == ':memory:'

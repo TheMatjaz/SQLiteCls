@@ -5,3 +5,4 @@ dist/
 docs/
 venv/
 .idea/
+testing_sqlite.*
