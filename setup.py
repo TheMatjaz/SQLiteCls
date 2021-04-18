@@ -14,7 +14,8 @@ import setuptools
 setup(
     name='SQLiteCls',
     version='0.1.0',
-    description='',
+    description='SQLite API wrapped into a class with automatic DB '
+                'initialisation upon DB creation and more utility functions',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='Matjaž Guštin',

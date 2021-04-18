@@ -45,3 +45,15 @@ with sqlitecls.SqliteDb('mydata.db', 'myinitscript.sql') as db:
     db.execute_sql_file('myotherfile.sql')  # Load WHOLE file in memory
 # Connection automatically closed now
 ```
+
+
+Installation
+----------------------------------------
+
+```
+pip install SQLteCls
+```
+
+or just include the `sqlitecls.py` file in your project (copy-paste).
+It's self-contained and has no dependencies other than the standard
+Python library.
