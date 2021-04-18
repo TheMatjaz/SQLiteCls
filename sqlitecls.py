@@ -50,7 +50,7 @@ class SqliteDb:
             self.execute_sql_file(self.init_script_file_name)
         return self
 
-    def close(self, commit: bool = True) -> None:
+    def close(self, commit: bool = False) -> None:
         """Close the connection gracefully."""
         if self.cursor:
             self.cursor.close()

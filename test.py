@@ -85,6 +85,7 @@ class TestSqliteDb(unittest.TestCase):
         db = sc.SqliteDb(DB_NAME, DB_INIT_SCRIPT_NAME)
         db.open()
         db.execute('INSERT INTO test_points(x, y) VALUES (100, 200)')
+        db.commit()
         db.close()
         self.assertTrue(os.path.isfile(DB_NAME))
         self.assertIsNone(db.connection)
