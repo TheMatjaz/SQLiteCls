@@ -1,0 +1,6 @@
+include CHANGELOG.md
+include LICENSE.md
+include README.md
+include test.py
+include testing_init.sql
+include .gitignore
