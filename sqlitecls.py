@@ -4,8 +4,20 @@
 # Copyright © 2021, Matjaž Guštin <dev@matjaz.it> <https://matjaz.it>.
 # Released under the BSD 3-Clause License
 
+"""SQLiteDb class wrapping the operations from the `sqlite3` module,
+providing better support for the `with` operator and automatic
+initialisation of an empty DB upon first creation of the DB.
+
+Additional wrappers are available as a utility, including
+extraction of a list of tables, extraction of the list of columns
+of a `SELECT` query, commit, rollback, start of a transaction,
+check if the DB is in memory and if it's empty. Executions of SQL script
+files is also made easy."""
+
 import sqlite3
-from typing import Optional, List, Any, Iterable
+from typing import Optional, List
+
+__VERSION__ = '0.1.0'
 
 
 def cursor_column_names(cursor: sqlite3.Cursor) -> List[str]:
@@ -87,6 +99,8 @@ class SqliteDb:
         return cursor.fetchone()[0]
 
     def execute(self, query: str, args: tuple = ()) -> sqlite3.Cursor:
+        """Executes a query using the pre-loaded cursor.
+        Refer to sqlite3.Cursor.execute() for more details."""
         return self.cursor.execute(query, args)
 
     def start_transaction(self) -> None:
