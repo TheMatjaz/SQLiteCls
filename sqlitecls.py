@@ -5,29 +5,16 @@
 # Released under the BSD 3-Clause License
 
 import sqlite3
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Iterable
+
+
+def cursor_column_names(cursor: sqlite3.Cursor) -> List[str]:
+    return [col[0] for col in cursor.description]
 
 
 class SqliteDb:
     """Class wrapper of an SQLite connection that can be reopened, loading
-    a DB-initialisations script when creating the file the first time.
-    """
-    Q_COUNT_TABLES = "SELECT count(*) FROM sqlite_master WHERE type='table'"
-    Q_TABLES = "SELECT name FROM sqlite_master WHERE type='table'"
-    Q_START = 'START TRANSACTION'
-    Q_ROLLBACK = 'ROLLBACK'
-    Q_COMMIT = 'COMMIT'
-    Q_VACUUM = 'VACUUM'
-    PRAGMAS = " " \
-              "" \
-              "PRAGMA journal_mode = WAL; " \
-              "PRAGMA cache_size = -100000; " \
-              "PRAGMA synchronous = EXTRA; " \
-              "PRAGMA temp_store = memory; "
-    PRAGMAS_PER_CONNECTION = "PRAGMA encoding = 'UTF-8'; " \
-                             "PRAGMA foreign_keys = ON; "
-    PRAGMAS_PER_DB = ""
-    PRAGMAS_HARD_CONSISTENCY = ""
+    a DB-initialisations script when creating the file the first time."""
 
     def __init__(self, db_file_name: str,
                  init_script_file_name: Optional[str] = None):
@@ -50,82 +37,74 @@ class SqliteDb:
         self.connection: Optional[sqlite3.Connection] = None
         self.cursor: Optional[sqlite3.Cursor] = None
 
-    def __enter__(self) -> 'SqliteDb':
-        """Enter the DB context: connect to it and load the init script
-        if the DB file was newly created."""
+    def open(self) -> 'SqliteDb':
+        """Connect to the DB and load the init script if the DB file was newly
+        created."""
         self.connection = sqlite3.connect(self.db_file_name)
         self.cursor = self.connection.cursor()
         if self.init_script_file_name and self.is_empty_db():
-            self.execute_file(self.init_script_file_name)
+            self.execute_sql_file(self.init_script_file_name)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def close(self, commit: bool = False) -> None:
         """Close the connection gracefully."""
         if self.cursor:
+            if commit:
+                self.commit()
             self.cursor.close()
             self.cursor = None
         if self.connection:
+            if commit:
+                self.connection.commit()
             self.connection.close()
             self.connection = None
 
-    def execute_file(self, file_name: str,
-                     encoding: str = 'UTF-8') -> sqlite3.Cursor:
+    def __enter__(self) -> 'SqliteDb':
+        """Enter the DB context: connect to it and load the init script
+        if the DB file was newly created."""
+        return self.open()
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Close the connection gracefully."""
+        self.close()
+
+    def execute_sql_file(self, file_name: str,
+                         encoding: str = 'UTF-8') -> sqlite3.Cursor:
         with open(file_name, encoding=encoding) as script:
             return self.cursor.executescript(script.read())
 
     def is_empty_db(self) -> bool:
-        """Returns true if the DB contains no tables, thus it's empty."""
-        return self.cursor.execute(self.Q_COUNT_TABLES).fetchone()[0] == 0
+        """Returns true if the DB contains no objects, thus it's empty."""
+        cursor = self.cursor.execute(
+            "SELECT count(*) = 0 FROM sqlite_master")
+        return cursor.fetchone()[0]
 
-    def __getitem__(self, item: str) -> Any:
-        return self.cursor.execute('PRAGMA ?', (item,)).fetchone()[0]
-
-    def __setitem__(self, key, value) -> None:
-        self.cursor.execute('PRAGMA ? = ?', (key, value))
+    def execute(self, query: str, args: tuple = ()) -> sqlite3.Cursor:
+        return self.cursor.execute(query, args)
 
     def start_transaction(self) -> None:
         """Starts a transaction on the cursor."""
-        self.cursor.execute(self.Q_START)
+        self.cursor.execute("START TRANSACTION")
 
     def rollback(self) -> None:
         """Rolls back the transaction on the cursor."""
-        self.cursor.execute(self.Q_ROLLBACK)
+        self.cursor.execute("ROLLBACK")
 
     def commit(self) -> None:
         """Commits the transaction on the cursor."""
-        self.cursor.execute(self.Q_COMMIT)
+        self.cursor.execute("COMMIT")
 
     def vacuum(self) -> None:
         """Vacuums the database."""
-        self.cursor.execute(self.Q_VACUUM)
+        self.cursor.execute("VACUUM")
 
     def tables_names(self) -> List[str]:
         """Fetches the names of all tables in the DB."""
-        return [row[0] for row in self.cursor.execute(self.Q_TABLES)]
+        cursor = self.cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")
+        return [row[0] for row in cursor]
 
-    def backup(self):
-        pass
-
-    def import(self):
-        pass
-
-    def export(self):
-        pass
-
-    def check(self):
-        self['foreign_key_check']  # TODO check output
-        self['integrity_check']  # Faster version: quick_check
-        pass  # .lint + pragma integrity check
-
-    def isolation_level(self):
-        pass
-
-    def journal_mode(self):
-        pass
-
-    def syncrhonisation(self):
-        pass
-
-    def db_size(self):
-        pass  # SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size();
-        # Also PRAGMA page_count; * PRAGMA page_size;
+    def columns_names(self, table_name: str) -> List[str]:
+        """Fetches the names of the columns in a given table."""
+        cursor = self.cursor.execute('PRAGMA table_info(?);', (table_name,))
+        return [row[1] for row in cursor]  # Extract just the names
